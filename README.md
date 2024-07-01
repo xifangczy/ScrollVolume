@@ -9,15 +9,23 @@
 # 参数
 
 -hotkey
+
 定义快捷键
+
 示例:
+
 ScrollVolume.exe -hotkey CONTROL+SHIFT+m
+
 就能改变快捷键为 ctrl+shift+m
 
 -taskbar
+
 开关 鼠标放入任务栏 可滚轮调节音量功能
+
 示例:
+
 ScrollVolume.exe -taskbar on
+
 ScrollVolume.exe -taskbar off
 
 # 开机启动
