@@ -15,24 +15,35 @@ Open the program, it will listen for the hotkey in the background. Default: ctrl
 
 ## -hotkey
 
-定义快捷键 Define the hotkey.
+定义快捷键
 
-示例 Example:
+示例:
 
 ScrollVolume.exe -hotkey CONTROL+SHIFT+m
 
 就能改变快捷键为 ctrl+shift+m
 
-This will change the hotkey to ctrl+shift+m
+Define the hotkey.
+
+Example:
+
+ScrollVolume.exe -hotkey CONTROL+SHIFT+m
+
+This will change the hotkey to ctrl+shift+m.
 
 ## -taskbar
 
 开关 鼠标放入任务栏 可滚轮调节音量功能
 
+示例:
+
+ScrollVolume.exe -taskbar on
+
+ScrollVolume.exe -taskbar off
+
 Toggle the feature to adjust the volume using the mouse wheel when the cursor is over the taskbar.
 
-
-示例 Example:
+Example:
 
 ScrollVolume.exe -taskbar on
 
@@ -40,5 +51,8 @@ ScrollVolume.exe -taskbar off
 
 # 开机启动 Startup
 
-把程序放入目录内 Place the program in the directory
+把程序放入目录内
+C:\ProgramData\Microsoft\Windows\Start Menu\Programs\StartUp
+
+Place the program in the directory:
 C:\ProgramData\Microsoft\Windows\Start Menu\Programs\StartUp
