@@ -90,21 +90,23 @@ void ParseArguments(LPSTR lpCmdLine) {
             cmdLine.erase(0, pos + 1);
         }
 
-        if (token == "-mod") {
+        if (token == "-hotkey") {
             pos = cmdLine.find(' ');
-            std::string modStr = (pos == std::string::npos) ? cmdLine : cmdLine.substr(0, pos);
+            std::string hotkeyStr = (pos == std::string::npos) ? cmdLine : cmdLine.substr(0, pos);
             cmdLine.erase(0, pos + 1);
+
             modKey = 0;
-            if (modStr.find("SHIFT") != std::string::npos) modKey |= MOD_SHIFT;
-            if (modStr.find("CONTROL") != std::string::npos) modKey |= MOD_CONTROL;
-            if (modStr.find("ALT") != std::string::npos) modKey |= MOD_ALT;
-            if (modStr.find("WIN") != std::string::npos) modKey |= MOD_WIN;
-        }
-        else if (token == "-key") {
-            pos = cmdLine.find(' ');
-            std::string keyStr = (pos == std::string::npos) ? cmdLine : cmdLine.substr(0, pos);
-            cmdLine.erase(0, pos + 1);
-            vkKey = VkKeyScanA(keyStr[0]);
+            size_t plusPos = 0;
+            while ((plusPos = hotkeyStr.find('+')) != std::string::npos) {
+                std::string modStr = hotkeyStr.substr(0, plusPos);
+                hotkeyStr.erase(0, plusPos + 1);
+
+                if (modStr == "SHIFT") modKey |= MOD_SHIFT;
+                if (modStr == "CONTROL") modKey |= MOD_CONTROL;
+                if (modStr == "ALT") modKey |= MOD_ALT;
+                if (modStr == "WIN") modKey |= MOD_WIN;
+            }
+            vkKey = VkKeyScanA(hotkeyStr[0]);
         }
         else if (token == "-taskbar") {
             pos = cmdLine.find(' ');
