@@ -8,7 +8,7 @@
 
 # 参数
 
--hotkey
+## -hotkey
 
 定义快捷键
 
@@ -18,7 +18,7 @@ ScrollVolume.exe -hotkey CONTROL+SHIFT+m
 
 就能改变快捷键为 ctrl+shift+m
 
--taskbar
+## -taskbar
 
 开关 鼠标放入任务栏 可滚轮调节音量功能
 
