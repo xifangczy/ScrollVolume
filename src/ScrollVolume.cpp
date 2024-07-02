@@ -1,11 +1,18 @@
 ﻿#include <windows.h>
 #include <iostream>
 #include <tchar.h>
+#include <shellapi.h>
+#include "resource.h"
+
+
+bool isVolumeControlActive = false; // 激活滚轮调节音量
+bool enableTaskbarVolumeControl = false;    // 激活任务栏调节音量
+bool enableTrayIcon = true; // 启用托盘图标
 
 // 定义全局变量
 HHOOK mouseHook = NULL;
-bool isVolumeControlActive = false;
-bool enableTaskbarVolumeControl = false;
+NOTIFYICONDATA nid = {};
+HMENU hMenu = NULL;
 
 UINT modKey = MOD_SHIFT | MOD_CONTROL | MOD_ALT; // 默认修饰键
 UINT vkKey = 'V'; // 默认主键
@@ -56,6 +63,41 @@ LRESULT CALLBACK MouseProc(int nCode, WPARAM wParam, LPARAM lParam) {
     return CallNextHookEx(mouseHook, nCode, wParam, lParam);
 }
 
+// 托盘图标
+void UpdateTrayIcon() {
+    wcscpy_s(nid.szTip, L"Scroll Volume");
+    if (isVolumeControlActive) {
+        wcscat_s(nid.szTip, L" (Active)");
+    }
+    if (enableTaskbarVolumeControl) {
+        wcscat_s(nid.szTip, L" (Taskbar Control)");
+    }
+    Shell_NotifyIcon(NIM_MODIFY, &nid);
+}
+void AddTrayIcon(HWND hwnd, HINSTANCE hInstance) {
+    nid.cbSize = sizeof(NOTIFYICONDATA);
+    nid.hWnd = hwnd;
+    nid.uID = 1;
+    nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
+    nid.uCallbackMessage = WM_APP;
+    nid.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1));
+    UpdateTrayIcon();
+    Shell_NotifyIcon(NIM_ADD, &nid);
+}
+void RemoveTrayIcon(HWND hwnd) {
+    Shell_NotifyIcon(NIM_DELETE, &nid);
+}
+// 右键菜单
+void ShowContextMenu(HWND hwnd, POINT pt) {
+    hMenu = CreatePopupMenu();
+    AppendMenu(hMenu, MF_STRING | (isVolumeControlActive ? MF_CHECKED : 0), 1, L"Activate Volume Control");
+    AppendMenu(hMenu, MF_STRING | (enableTaskbarVolumeControl ? MF_CHECKED : 0), 2, L"Enable Taskbar Volume Control");
+    AppendMenu(hMenu, MF_STRING, 3, L"Exit");
+    SetForegroundWindow(hwnd);
+    TrackPopupMenu(hMenu, TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd, NULL);
+    DestroyMenu(hMenu);
+}
+
 // 窗口过程函数
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg) {
@@ -65,8 +107,30 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             isVolumeControlActive = !isVolumeControlActive;
         }
         break;
+    case WM_COMMAND:
+            switch (LOWORD(wParam)) {
+            case 1:
+                isVolumeControlActive = !isVolumeControlActive;
+                UpdateTrayIcon();
+                break;
+            case 2:
+                enableTaskbarVolumeControl = !enableTaskbarVolumeControl;
+                UpdateTrayIcon();
+                break;
+            case 3:
+                PostQuitMessage(0);
+                break;
+            }
+        break;
     case WM_DESTROY:
         PostQuitMessage(0);
+        break;
+    case WM_APP:
+        if (lParam == WM_RBUTTONUP) {
+            POINT pt;
+            GetCursorPos(&pt);
+            ShowContextMenu(hwnd, pt);
+        }
         break;
     default:
         return DefWindowProc(hwnd, uMsg, wParam, lParam);
@@ -113,6 +177,11 @@ void ParseArguments(LPSTR lpCmdLine) {
             std::string taskbarStr = (pos == std::string::npos) ? cmdLine : cmdLine.substr(0, pos);
             cmdLine.erase(0, pos + 1);
             enableTaskbarVolumeControl = (taskbarStr == "on");
+        }else if (token == "-trayicon") {
+            pos = cmdLine.find(' ');
+            std::string taskbarStr = (pos == std::string::npos) ? cmdLine : cmdLine.substr(0, pos);
+            cmdLine.erase(0, pos + 1);
+            enableTrayIcon = (taskbarStr == "on");
         }
     }
 }
@@ -132,6 +201,11 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
     // 创建隐形窗口
     HWND hwnd = CreateWindowEx(0, className, L"Scroll Volume", 0, 0, 0, 0, 0, HWND_MESSAGE, NULL, hInstance, NULL);
 
+    if (enableTrayIcon) {
+        // 添加托盘图标
+        AddTrayIcon(hwnd, hInstance);
+    }
+
     // 注册全局热键
     RegisterHotKey(hwnd, 1, modKey, vkKey);
 
@@ -147,6 +221,9 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 
     // 释放钩子
     UnhookWindowsHookEx(mouseHook);
+
+    // 移除托盘图标
+    RemoveTrayIcon(hwnd);
 
     return 0;
 }
