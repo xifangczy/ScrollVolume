@@ -6,15 +6,18 @@
 #include < sstream >
 
 bool isVolumeControlActive = false; // 激活滚轮调节音量
+bool _isVolumeControlActive = false; // 保存状态
 bool enableTaskbarVolumeControl = false;    // 激活任务栏调节音量
+bool _enableTaskbarVolumeControl = false;    // 保存状态
 bool enableTrayIcon = true; // 启用托盘图标
+bool Pause = false;
 
 // 定义全局变量
 HHOOK mouseHook = NULL;
 NOTIFYICONDATA nid = {};
 HMENU hMenu = NULL;
 
-UINT modKey = MOD_SHIFT | MOD_CONTROL | MOD_ALT; // 默认修饰键
+UINT modKey = MOD_SHIFT | MOD_ALT; // 默认修饰键
 UINT vkKey = 'V'; // 默认主键
 
 // 检查窗口是否是任务栏或其子窗口
@@ -105,16 +108,17 @@ static void ShowContextMenu(HWND hwnd, POINT pt) {
     AppendMenu(hMenu, MF_SEPARATOR, 0, NULL);
     AppendMenu(hMenu, MF_STRING | (isVolumeControlActive ? MF_CHECKED : 0), 1, L"Activate Volume Control");
     AppendMenu(hMenu, MF_STRING | (enableTaskbarVolumeControl ? MF_CHECKED : 0), 2, L"Enable Taskbar Volume Control");
+    AppendMenu(hMenu, MF_STRING | (Pause ? MF_CHECKED : 0), 3, L"Pause");
     AppendMenu(hMenu, MF_SEPARATOR, 0, NULL);
-    AppendMenu(hMenu, MF_STRING | 0, 3, L"Help");
-    AppendMenu(hMenu, MF_STRING, 4, L"Exit");
+    AppendMenu(hMenu, MF_STRING | 0, 4, L"Help");
+    AppendMenu(hMenu, MF_STRING, 5, L"Exit");
     SetForegroundWindow(hwnd);
     TrackPopupMenu(hMenu, TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd, NULL);
     DestroyMenu(hMenu);
 }
 
 // 窗口过程函数
-LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg) {
     case WM_HOTKEY:
         if (wParam == 1) {
@@ -125,14 +129,34 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
     case WM_COMMAND:
             switch (LOWORD(wParam)) {
             case 1:
+                if (Pause) { break; }
                 isVolumeControlActive = !isVolumeControlActive;
                 UpdateTrayIcon();
                 break;
             case 2:
+                if (Pause) { break; }
                 enableTaskbarVolumeControl = !enableTaskbarVolumeControl;
                 UpdateTrayIcon();
                 break;
             case 3:
+                Pause = !Pause;
+                if (Pause) {
+                    _isVolumeControlActive = isVolumeControlActive;
+                    isVolumeControlActive = false;
+
+                    _enableTaskbarVolumeControl = enableTaskbarVolumeControl;
+                    enableTaskbarVolumeControl = false;
+
+					UnregisterHotKey(hwnd, 1);
+				} else {
+                    isVolumeControlActive = _isVolumeControlActive;
+					enableTaskbarVolumeControl = _enableTaskbarVolumeControl;
+
+					RegisterHotKey(hwnd, 1, modKey, vkKey);
+				}
+                UpdateTrayIcon();
+                break;
+            case 4:
                 MessageBox(NULL,
                     L"Usage: ScrollVolume [options]\n"
                     L"Options:\n"
@@ -143,7 +167,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                     L"ScrollVolume Help",
                     MB_OK | MB_ICONINFORMATION);
                 break;
-            case 4:
+            case 5:
                 PostQuitMessage(0);
                 break;
             }
