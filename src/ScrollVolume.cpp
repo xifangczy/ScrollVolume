@@ -3,7 +3,7 @@
 #include <tchar.h>
 #include <shellapi.h>
 #include "resource.h"
-
+#include < sstream >
 
 bool isVolumeControlActive = false; // 激活滚轮调节音量
 bool enableTaskbarVolumeControl = false;    // 激活任务栏调节音量
@@ -18,7 +18,7 @@ UINT modKey = MOD_SHIFT | MOD_CONTROL | MOD_ALT; // 默认修饰键
 UINT vkKey = 'V'; // 默认主键
 
 // 检查窗口是否是任务栏或其子窗口
-bool IsTaskbarWindow(HWND hWnd) {
+static bool IsTaskbarWindow(HWND hWnd) {
     TCHAR className[256];
     while (hWnd != NULL) {
         GetClassName(hWnd, className, 256);
@@ -31,7 +31,7 @@ bool IsTaskbarWindow(HWND hWnd) {
 }
 
 // 检查鼠标是否在任务栏上
-bool IsMouseOnTaskbar() {
+static bool IsMouseOnTaskbar() {
     if (!enableTaskbarVolumeControl) {
         return false;
     }
@@ -42,7 +42,7 @@ bool IsMouseOnTaskbar() {
 }
 
 // 鼠标钩子回调函数
-LRESULT CALLBACK MouseProc(int nCode, WPARAM wParam, LPARAM lParam) {
+static LRESULT CALLBACK MouseProc(int nCode, WPARAM wParam, LPARAM lParam) {
     if (nCode >= 0) {
         if (wParam == WM_MOUSEWHEEL) {
             MSLLHOOKSTRUCT* mouseStruct = (MSLLHOOKSTRUCT*)lParam;
@@ -64,7 +64,7 @@ LRESULT CALLBACK MouseProc(int nCode, WPARAM wParam, LPARAM lParam) {
 }
 
 // 托盘图标
-void UpdateTrayIcon() {
+static void UpdateTrayIcon() {
     wcscpy_s(nid.szTip, L"Scroll Volume");
     if (isVolumeControlActive) {
         wcscat_s(nid.szTip, L" (Active)");
@@ -74,7 +74,7 @@ void UpdateTrayIcon() {
     }
     Shell_NotifyIcon(NIM_MODIFY, &nid);
 }
-void AddTrayIcon(HWND hwnd, HINSTANCE hInstance) {
+static void AddTrayIcon(HWND hwnd, HINSTANCE hInstance) {
     nid.cbSize = sizeof(NOTIFYICONDATA);
     nid.hWnd = hwnd;
     nid.uID = 1;
@@ -84,15 +84,30 @@ void AddTrayIcon(HWND hwnd, HINSTANCE hInstance) {
     UpdateTrayIcon();
     Shell_NotifyIcon(NIM_ADD, &nid);
 }
-void RemoveTrayIcon(HWND hwnd) {
+static void RemoveTrayIcon(HWND hwnd) {
     Shell_NotifyIcon(NIM_DELETE, &nid);
 }
+
+static std::wstring GetHotkeyDescription() {
+    std::wstringstream ss;
+    if (modKey & MOD_CONTROL) ss << L"Ctrl + ";
+    if (modKey & MOD_SHIFT) ss << L"Shift + ";
+    if (modKey & MOD_ALT) ss << L"Alt + ";
+    if (modKey & MOD_WIN) ss << L"Win + ";
+    ss << (wchar_t)MapVirtualKey(vkKey, MAPVK_VK_TO_CHAR);
+    return ss.str();
+}
+
 // 右键菜单
-void ShowContextMenu(HWND hwnd, POINT pt) {
+static void ShowContextMenu(HWND hwnd, POINT pt) {
     hMenu = CreatePopupMenu();
+    AppendMenu(hMenu, MF_STRING | MF_GRAYED, 0, GetHotkeyDescription().c_str());
+    AppendMenu(hMenu, MF_SEPARATOR, 0, NULL);
     AppendMenu(hMenu, MF_STRING | (isVolumeControlActive ? MF_CHECKED : 0), 1, L"Activate Volume Control");
     AppendMenu(hMenu, MF_STRING | (enableTaskbarVolumeControl ? MF_CHECKED : 0), 2, L"Enable Taskbar Volume Control");
-    AppendMenu(hMenu, MF_STRING, 3, L"Exit");
+    AppendMenu(hMenu, MF_SEPARATOR, 0, NULL);
+    AppendMenu(hMenu, MF_STRING | 0, 3, L"Help");
+    AppendMenu(hMenu, MF_STRING, 4, L"Exit");
     SetForegroundWindow(hwnd);
     TrackPopupMenu(hMenu, TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd, NULL);
     DestroyMenu(hMenu);
@@ -118,6 +133,17 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 UpdateTrayIcon();
                 break;
             case 3:
+                MessageBox(NULL,
+                    L"Usage: ScrollVolume [options]\n"
+                    L"Options:\n"
+                    L"  -help            Display this help message\n"
+                    L"  -hotkey <SHIFT|CONTROL|ALT|WIN>+<key> Set the hotkey for volume control\n"
+                    L"  -taskbar <on|off> Enable or disable taskbar volume control\n"
+                    L"  -trayicon <on|off> Enable or disable tray icon\n",
+                    L"ScrollVolume Help",
+                    MB_OK | MB_ICONINFORMATION);
+                break;
+            case 4:
                 PostQuitMessage(0);
                 break;
             }
@@ -139,7 +165,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 }
 
 // 解析启动参数
-void ParseArguments(LPSTR lpCmdLine) {
+static void ParseArguments(LPSTR lpCmdLine) {
     std::string cmdLine(lpCmdLine);
     size_t pos = 0;
     std::string token;
@@ -171,8 +197,7 @@ void ParseArguments(LPSTR lpCmdLine) {
                 if (modStr == "WIN") modKey |= MOD_WIN;
             }
             vkKey = VkKeyScanA(hotkeyStr[0]);
-        }
-        else if (token == "-taskbar") {
+        }else if (token == "-taskbar") {
             pos = cmdLine.find(' ');
             std::string taskbarStr = (pos == std::string::npos) ? cmdLine : cmdLine.substr(0, pos);
             cmdLine.erase(0, pos + 1);
@@ -186,7 +211,7 @@ void ParseArguments(LPSTR lpCmdLine) {
     }
 }
 
-int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
     // 解析启动参数
     ParseArguments(lpCmdLine);
 
