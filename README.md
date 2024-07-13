@@ -8,7 +8,7 @@ Adjust the volume using the mouse wheel.
 
 打开程序，后台监听快捷键 默认：shift+alt+V 按下后 鼠标滚轮会变成音量调节，再次按下取消。
 
-Open the program, it will listen for the hotkey in the background. Default: ctrl+shift+alt+V. After pressing it, the mouse wheel will become a volume control. Press it again to cancel.
+Open the program, it will listen for the hotkey in the background. Default: shift+alt+V. After pressing it, the mouse wheel will become a volume control. Press it again to cancel.
 
 
 # 参数 Parameters
