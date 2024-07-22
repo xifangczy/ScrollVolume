@@ -3,7 +3,7 @@
 #include <tchar.h>
 #include <shellapi.h>
 #include "resource.h"
-#include < sstream >
+#include <sstream>
 
 bool isVolumeControlActive = false; // 激活滚轮调节音量
 bool _isVolumeControlActive = false; // 保存状态
@@ -19,6 +19,39 @@ HMENU hMenu = NULL;
 
 UINT modKey = MOD_SHIFT | MOD_ALT; // 默认修饰键
 UINT vkKey = 'V'; // 默认主键
+
+// 函数将 std::wstring 转换为 std::string
+std::string WStringToString(const std::wstring& wstr) {
+    int size_needed = WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), (int)wstr.size(), NULL, 0, NULL, NULL);
+    std::string strTo(size_needed, 0);
+    WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), (int)wstr.size(), &strTo[0], size_needed, NULL, NULL);
+    return strTo;
+}
+
+// 全局变量储存 config.ini 位置
+static std::wstring g_configFilePath = L".\\ScrollVolumeConfig.ini";
+
+// 读取配置
+static bool ReadConfig(const wchar_t* section, const wchar_t* key, bool defaultValue) {
+    wchar_t result[10];
+    GetPrivateProfileStringW(section, key, defaultValue ? L"1" : L"0", result, 10, g_configFilePath.c_str());
+    return _wtoi(result) != 0;
+}
+
+static std::string ReadStringConfig(const wchar_t* section, const wchar_t* key, const std::wstring& defaultValue) {
+    wchar_t result[256];
+    GetPrivateProfileStringW(section, key, defaultValue.c_str(), result, 256, g_configFilePath.c_str());
+    return WStringToString(result);
+}
+
+// 写入配置
+static void WriteConfig(const wchar_t* section, const wchar_t* key, bool value) {
+    WritePrivateProfileStringW(section, key, value ? L"1" : L"0", g_configFilePath.c_str());
+}
+
+static void WriteStringConfig(const wchar_t* section, const wchar_t* key, const std::wstring& value) {
+    WritePrivateProfileStringW(section, key, value.c_str(), g_configFilePath.c_str());
+}
 
 // 检查窗口是否是任务栏或其子窗口
 static bool IsTaskbarWindow(HWND hWnd) {
@@ -132,11 +165,13 @@ static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
                 if (Pause) { break; }
                 isVolumeControlActive = !isVolumeControlActive;
                 UpdateTrayIcon();
+                //WriteConfig(L"Settings", L"VolumeControlActive", isVolumeControlActive);
                 break;
             case 2:
                 if (Pause) { break; }
                 enableTaskbarVolumeControl = !enableTaskbarVolumeControl;
                 UpdateTrayIcon();
+                WriteConfig(L"Settings", L"TaskbarVolumeControl", enableTaskbarVolumeControl);
                 break;
             case 3:
                 Pause = !Pause;
@@ -188,11 +223,36 @@ static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
     return 0;
 }
 
+// 解析快捷键
+static void ParseHotKey(std::string hostKey) {
+    modKey = 0;
+    size_t plusPos = 0;
+    while ((plusPos = hostKey.find('+')) != std::string::npos) {
+        std::string modStr = hostKey.substr(0, plusPos);
+        hostKey.erase(0, plusPos + 1);
+
+        if (modStr == "SHIFT") modKey |= MOD_SHIFT;
+        if (modStr == "CONTROL") modKey |= MOD_CONTROL;
+        if (modStr == "ALT") modKey |= MOD_ALT;
+        if (modStr == "WIN") modKey |= MOD_WIN;
+    }
+    vkKey = hostKey[0];
+}
+
 // 解析启动参数
 static void ParseArguments(LPSTR lpCmdLine) {
     std::string cmdLine(lpCmdLine);
     size_t pos = 0;
     std::string token;
+
+    // 读取配置
+    isVolumeControlActive = ReadConfig(L"Settings", L"VolumeControlActive", isVolumeControlActive);
+    enableTaskbarVolumeControl = ReadConfig(L"Settings", L"TaskbarVolumeControl", enableTaskbarVolumeControl);
+    enableTrayIcon = ReadConfig(L"Settings", L"TrayIcon", enableTrayIcon);
+
+    // 加载快捷键配置
+    std::string HotKey = ReadStringConfig(L"Settings", L"HotKey", L"SHIFT+ALT+V");
+    ParseHotKey(HotKey);
 
     while ((pos = cmdLine.find(' ')) != std::string::npos || !cmdLine.empty()) {
         if (pos == std::string::npos) {
@@ -208,19 +268,7 @@ static void ParseArguments(LPSTR lpCmdLine) {
             pos = cmdLine.find(' ');
             std::string hotkeyStr = (pos == std::string::npos) ? cmdLine : cmdLine.substr(0, pos);
             cmdLine.erase(0, pos + 1);
-
-            modKey = 0;
-            size_t plusPos = 0;
-            while ((plusPos = hotkeyStr.find('+')) != std::string::npos) {
-                std::string modStr = hotkeyStr.substr(0, plusPos);
-                hotkeyStr.erase(0, plusPos + 1);
-
-                if (modStr == "SHIFT") modKey |= MOD_SHIFT;
-                if (modStr == "CONTROL") modKey |= MOD_CONTROL;
-                if (modStr == "ALT") modKey |= MOD_ALT;
-                if (modStr == "WIN") modKey |= MOD_WIN;
-            }
-            vkKey = VkKeyScanA(hotkeyStr[0]);
+            ParseHotKey(hotkeyStr);
         }else if (token == "-taskbar") {
             pos = cmdLine.find(' ');
             std::string taskbarStr = (pos == std::string::npos) ? cmdLine : cmdLine.substr(0, pos);
