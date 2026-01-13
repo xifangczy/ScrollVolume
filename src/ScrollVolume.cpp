@@ -287,6 +287,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     // 解析启动参数
     ParseArguments(lpCmdLine);
 
+    SetProcessDPIAware();
+
     // 注册窗口类
     const wchar_t* className = L"ScrollVolumeClass";
     WNDCLASS wc = {};
